@@ -1,0 +1,96 @@
+/*****************************************************************************/
+/**
+ *  @file   main.cpp
+ *  @brief  Example program for kvs::SphereGlyph class.
+ *  @author Naohisa Sakamoto
+ */
+/*****************************************************************************/
+#include <kvs/Message>
+#include <kvs/StructuredVolumeObject>
+#include <kvs/StructuredVolumeImporter>
+//#include <kvs/SphereGlyph>
+#include <kvs/TornadoVolumeData>
+#include <kvs/glut/Application>
+#include <kvs/glut/Screen>
+#include "SphereGlyph.h"
+//#include "SphereGlyph_test.h"
+
+/*===========================================================================*/
+/**
+ *  @brief  Main function.
+ *  @param  argc [i] argument counter
+ *  @param  argv [i] argument values
+ *  @return true, if the main process is done succesfully
+ */
+/*===========================================================================*/
+int main( int argc, char** argv )
+{
+    kvs::glut::Application app( argc, argv );
+:
+    int n_glyphs = 2;
+    //glyph->setGlyphNum(sp_num); //
+    kvs::ValueArray<kvs::Real32> pos;
+    // 4 debug
+    pos.allocate(3*n_glyphs);
+    pos.at(0) = 0;
+    pos.at(1) = 0;
+    pos.at(2) = 0;
+    pos.at(3) = 0;
+    pos.at(4) = 0;
+    pos.at(5) = 3;
+  
+  
+    // Create an sphere glyph renderer.
+    kvs::PolygonObject* glyph_polygon = new kvs::SphereGlyph( n_glyphs, pos );
+//    kvs::SphereGlyph* glyph = new kvs::SphereGlyph();
+//    if ( !glyph )
+//    {
+//        kvsMessageError() << "Cannot creat a glyph renderer." << std::endl;
+//        return ( false );
+//    }
+
+    // Set properties.
+//    const kvs::TransferFunction tfunc( 256 );
+//    glyph->setTransferFunction( tfunc );
+    
+    // setting sphere option
+    
+//    glyph->setNumberOfSlices( 10 ); //経度
+//    glyph->setNumberOfStacks( 10 ); //緯度
+//    glyph->setPosition( pos );　
+    
+//    glyph->setSphereSize( 1.0f );//　球サイズ
+//    glyph->setOpacity(255); //透明度　min:0 max:255
+//    kvs::RGBColor color(255, 255, 255 ); // 色
+//    glyph->setRGBColor( color);
+//    //glyph->setcolor();
+//    glyph -> setpolygon();
+//    glyph -> setNormalType(kvs::SphereGlyph::VertexNormal);
+    
+//    kvs::PolygonObject* object = glyph;
+ 
+//    std::cout << "object->coord()  = " << float(object->coords()[0]) << ", " <<  float(object->coords()[1]) << ", " << float(object->coords()[2]) << ", "  << 
+//        float(object->coords()[402]) << ", " <<  float(object->coords()[403]) << ", " << float(object->coords()[404]) << ", " <<
+//        float(object->coords()[802]) << ", " <<  float(object->coords()[803]) << ", " << float(object->coords()[804]) << ", " << std::endl;
+
+    kvs::glut::Screen screen( &app );
+//    kvs::PolygonObject* object = glyph;
+//    if ( !object )
+//    {
+//        kvsMessageError() << "Cannot create a polygon object." << std::endl;
+//        return ( false );
+//    }
+
+    screen.registerObject( glyph_polygon );
+    screen.show();
+//    kvs::glut::Screen screen( &app );
+//    screen.registerObject( object, glyph );
+//    screen.setGeometry( 0, 0, 512, 512 );
+//    screen.setTitle( "kvs::SphereGlyph" );
+//    screen.show();
+
+
+
+
+    return app.run();
+}
