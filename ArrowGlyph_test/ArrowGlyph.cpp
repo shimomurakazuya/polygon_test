@@ -426,7 +426,6 @@ void  ArrowGlyph::GenerateNormalizedPolygon()
 
     const kvs::Vec3 T0( 0.0f, 0.0f, 0.7f ); // translation vector (cone)
                                             //    const kvs::Vec3 T1( 0.0f, 0.0f, 0.0f ); // translation vector (cylinder)
-
     int  n_coords_cone= 126;
     int  n_coords_tube= 63; 
     int  n_coords     = 189; // =(20+1)*(5+1) + (20+1)*(2+1)
@@ -437,9 +436,6 @@ void  ArrowGlyph::GenerateNormalizedPolygon()
     kvs::ValueArray<kvs::UInt32> local_connection;
     kvs::ValueArray<kvs::Real32> local_normal;
 
-    //local_coords.allocate(m_glyph_num*3*n_coords);
-    //local_normal.allocate(m_glyph_num*3*n_coords);
-    //local_connection.allocate(m_glyph_num*n_connection);
     local_coords.allocate(3*n_coords);
     local_normal.allocate(3*n_coords);
     local_connection.allocate(n_connection);
@@ -568,7 +564,6 @@ void  ArrowGlyph::GenerateNormalizedPolygon()
             coord_id      +=3;
         }
     }
-    std::cout  <<  __PRETTY_FUNCTION__ <<" : "<<__LINE__ << std::endl;
     int line_size = slices + 1;
     int vertex_index = 0;  
     for (j = 0; j < stacks; j++)
@@ -674,7 +669,6 @@ void  ArrowGlyph::GenerateNormalizedPolygon()
     }
     //        line_size = slices + 1;
     vertex_index = 126; 
-    //       std::cout  << "vertex_index = " << vertex_index <<std::endl; 
     for (j = 0; j < stacks; j++)
     {
         for (i = 0; i <= slices; i++)
@@ -701,7 +695,7 @@ void  ArrowGlyph::GenerateNormalizedPolygon()
     m_coords = local_coords;
     m_normal = local_normal;
     m_connection = local_connection; 
-    //#if 0
+#ifdef DEBUG
     std::cout << "connection_id = " << connection_id <<std::endl;
     std::cout << "coord_id = " << coord_id <<std::endl;
     std::cout << "object->coord()  = " << float(local_coords[0]) << ", " <<  float(local_coords[1]) << ", " << float(local_coords[2]) << ", "  << 
@@ -709,10 +703,7 @@ void  ArrowGlyph::GenerateNormalizedPolygon()
         float(local_coords[564]) << ", " <<  float(local_coords[565]) << ", " << float(local_coords[566]) << ", " << std::endl;
     std::cout << "connection[id]  = " << float(local_connection[0]) << ", " <<  float(local_connection[1]) << ", " << float(local_connection[2]) << ", "  << 
         float(local_connection[879]) << ", " <<  float(local_connection[880]) << ", " << float(local_connection[881]) << ", " << std::endl;
-    //#endif 
-
-#if 0
-//debug    
+//
 //    SuperClass::setCoords( m_coords  ); 
 //    SuperClass::setConnections( m_connection );
 //    SuperClass::setColor( m_color );
@@ -746,87 +737,73 @@ void ArrowGlyph::Transform(const int nglyphs,
    
     const float Pi = 3.14159265358979323846;
     const kvs::Vec3 DefaultDirection = kvs::Vec3( 0.0, 1.0, 0.0 );
-//    const kvs::Real32 R = -0.5*Pi; //  -90.0f;              // rotation angle
-//    const kvs::Real32 R = 0.f; //  -90.0f;              // rotation angle
-    float R[2]={0.f, float(-0.5*Pi)}; //  -90.0f;              // rotation angle
+    const kvs::Real32 R = -0.5*Pi; //  -90.0f;              // rotation angle
     const kvs::Vector3f V( 1.0f, 0.0f, 0.0f ); // rotation vector
+
+//    float R[2]={0.f, float(-0.5*Pi)}; //              // rotation angle array
+
     for (int gly_id = 0; gly_id< nglyphs; gly_id++ )
     {   
         int glyph_cnt = gly_id * n_coords/3;
         int index = 3*gly_id;
 
-        kvs::Vector3f dir(direction.at(gly_id),
-                          direction.at(gly_id+1),
-                          direction.at(gly_id+2));
-        // 4 translate & scaling
+        kvs::Vector3f dir(direction.at(index),
+                          direction.at(index+1),
+                          direction.at(index+2));
+        std::cout << "dir = " << dir.x() << ", "<< dir.y() << ", "<<dir.z() << std::endl;
+        // translate & scaling option
         const kvs::Vector3f trans_direction = dir.normalized();
+        std::cout << "trans_direction = " << trans_direction.x() << ", "<< trans_direction.y() << ", "<< trans_direction.z() << std::endl;
         const kvs::Vec3 v = trans_direction.normalized();
         const kvs::Vec3 c = DefaultDirection.cross( v );
+        std::cout << "v = " << v.x() << ", "<< v.y() << ", "<< v.z() << std::endl;
+        std::cout << "c = " << c.x() << ", "<< c.y() << ", "<< c.z() << std::endl;
         const float d = DefaultDirection.dot( v );
         const float s = static_cast<float>( std::sqrt( ( 1.0 + d ) * 2.0 ) );
         const kvs::Quaternion q( c.x()/s, c.y()/s, c.z()/s, s/2.0f );
+        std::cout << "q = " << q.x() << ", "<< q.y() << ", "<< q.z() << ", " << q.w()<< std::endl;
         const kvs::Mat3 trans_scale = q.toMatrix();
         const kvs::Vector3f trans_position(position.data()+ index);
-        std::cout << "trans_position = " << trans_position.x() << ", " << trans_position.y() << ", " << trans_position.z()  << std::endl;
         const kvs::Xform xform_trans( trans_position, BaseClass::scale() * m_size, trans_scale );
 
-        // 4 rotate
-        //        kvs::OpenGL::Rotate( R, V );
+        // rotate option
         float x= V.x();
         float y= V.y();
         float z= V.z();
-        float cos=std::cos(R[gly_id]);
-        float sin=std::sin(R[gly_id]);
-//        float cos=std::cos(R);
-//        float sin=std::sin(R);
+//        float cos=std::cos(R[gly_id]);
+//        float sin=std::sin(R[gly_id]);
+        float cos=std::cos(R);
+        float sin=std::sin(R);
 
         kvs::Mat4 rot( x*x*(1.0f-cos)+cos, x*y*(1.0f-cos)-z*sin, x*z*(1.0f-cos)+y*sin, 0,
                        y*x*(1.0f-cos)*-z*sin, y*y*(1.0f-cos)+cos,y*z*(1.0f-cos)-x*sin, 0,
                        x*z*(1.0f-cos)*-y*sin, y*z*(1.0f-cos)+x*sin, z*z*(1.0f-cos)+cos,0,
                        0, 0, 0, 1); 
         kvs::Xform xform_rot(rot);
-
-//        for (int i =0; i< 4; i++)
-//        {
-//            std::cout << "rot[0]["<< i<<"]="<< rot[0][i] << std::endl;
-//            std::cout << "rot[1]["<< i<<"]="<< rot[1][i] << std::endl;
-//            std::cout << "rot[2]["<< i<<"]="<< rot[2][i] << std::endl;
-//            std::cout << "rot[3]["<< i<<"]="<< rot[3][i] << std::endl;
-//        }
+        
+#ifdef DEBUG
+        for(int i =0; i<4 ;i++)
+        {
+            std::cout << "xform_trans.toMatrix[0]["<<i<<"]=" <<xform_trans.toMatrix()[0][i] << std::endl;
+            std::cout << "xform_trans.toMatrix[1]["<<i<<"]=" <<xform_trans.toMatrix()[1][i] << std::endl;
+            std::cout << "xform_trans.toMatrix[2]["<<i<<"]=" <<xform_trans.toMatrix()[2][i] << std::endl;
+            std::cout << "xform_trans.toMatrix[3]["<<i<<"]=" <<xform_trans.toMatrix()[3][i] << std::endl;
+        }
+#endif
         for (int id = 0; id < n_coords; id +=3)
         {
             kvs::Vec3 co(m_coords.at(id), m_coords.at(id+1), m_coords.at(id+2)); 
             kvs::Vec3 co_normal(m_normal.at(id), m_normal.at(id+1), m_normal.at(id+2)); 
 
-//            //rotate
-//            co        = co*xform_rot.rotation();
-//            co_normal = co_normal*xform_rot.rotation(); 
-            kvs::Vec3 rot;        
-            kvs::Vec3 rot_normal; 
-            rot        = co*xform_rot.rotation(); 
-            rot_normal = co_normal*xform_rot.rotation(); 
+            //rotate
+            co        = co*xform_rot.rotation();
+            co_normal = co_normal*xform_rot.rotation(); 
 
             //scale & translate
-            co        = xform_trans.transform(rot);
-            co_normal = xform_trans.transformNormal(rot_normal);
-//            co        = xform_trans.transform(co);
-//            co_normal = xform_trans.transformNormal(co_normal);
-
- 
-//            //  translate
-//            kvs::Vec3 trans;  
-//            trans = co + xform_trans.translation();
-//
-//            //  scale
-//            kvs::Vec3 scale_factor         =xform_trans.scaling();
-//            kvs::Vec3 scale_factor_inverse (1/xform_trans.scaling().x(), 1/xform_trans.scaling().y(), 1/xform_trans.scaling().z());
-//
-//            kvs::Vec3 scale        = trans*scale_factor;
-//            kvs::Vec3 scale_normal = co_normal*scale_factor_inverse;
-//
-//            //rotate 
-//            kvs::Vec3 rot        = scale*xform_rot.rotation(); 
-//            kvs::Vec3 rot_normal = scale_normal*xform_rot.rotation(); 
+//            co        = co*xform_trans.rotation();
+//            co_normal = co_normal*xform_trans.rotation(); 
+            co        = xform_trans.transform(co);
+            co_normal = xform_trans.transformNormal(co_normal);
 
             // set global value
             gl_coords.at(gly_id*n_coords+id  )= co[0]; 
@@ -843,8 +820,6 @@ void ArrowGlyph::Transform(const int nglyphs,
             gl_connection.at(gly_id*n_connection+id+1)= m_connection[id+1]+glyph_cnt; 
             gl_connection.at(gly_id*n_connection+id+2)= m_connection[id+2]+glyph_cnt; 
         }
-    std::cout << "nglyphs*n_connection = " << nglyphs*n_connection <<std::endl; 
-    std::cout << "glyph_cnt= " << glyph_cnt  <<std::endl; 
     }
 
     m_coords.allocate(gl_coords.size());
@@ -855,21 +830,14 @@ void ArrowGlyph::Transform(const int nglyphs,
     m_normal = gl_normal;
     m_connection = gl_connection;
 
-//#ifdef DEBUG
+#ifdef DEBUG
     std::cout << "object->coord()  = " << float(gl_coords[0]) << ", " <<  float(gl_coords[1]) << ", " << float(gl_coords[2]) << ", "  << 
         float(gl_coords[402]) << ", " <<  float(gl_coords[403]) << ", " << float(gl_coords[404]) << ", " <<
         float(gl_coords[564]) << ", " <<  float(gl_coords[565]) << ", " << float(gl_coords[566]) << ", " << std::endl;
-    std::cout << "m_coord()  = " << float(m_coords[0]) << ", " <<  float(m_coords[1]) << ", " << float(m_coords[2]) << ", "  << 
-        float(m_coords[402]) << ", " <<  float(m_coords[403]) << ", " << float(m_coords[404]) << ", " <<
-        float(m_coords[882]) << ", " <<  float(m_coords[883]) << ", " << float(m_coords[884]) << ", " << std::endl;
-    std::cout << "connection[id]  = " << float(gl_connection[0]) << ", " <<  float(gl_connection[1]) << ", " << float(gl_connection[2]) << ", "  << 
-        float(gl_connection[879]) << ", " <<  float(gl_connection[880]) << ", " << float(gl_connection[881]) << ", " << std::endl;
-    std::cout << "m_connection[id]  = " << float(m_connection[0]) << ", " <<  float(m_connection[1]) << ", " << float(m_connection[2]) << ", "  << 
-        float(m_connection[879]) << ", " <<  float(m_connection[880]) << ", " << float(m_connection[881]) << ", " << std::endl;
     std::cout << "connection[id]  = " << float(gl_connection[882]) << ", " <<  float(gl_connection[883]) << ", " << float(gl_connection[884]) << ", "  << 
         float(gl_connection[1761]) << ", " <<  float(gl_connection[1762]) << ", " << float(gl_connection[1763]) << ", " << std::endl;
     std::cout  <<  __PRETTY_FUNCTION__ <<" : "<<__LINE__ << std::endl;
-//#endif
+#endif
 
     // set polygon
     SuperClass::setCoords( m_coords  ); 

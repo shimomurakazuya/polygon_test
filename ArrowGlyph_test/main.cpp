@@ -40,18 +40,18 @@ int main( int argc, char** argv )
     position.at(0) = 2;
     position.at(1) = 2;
     position.at(2) = 2;
-    position.at(3) = 2;
-    position.at(4) = 2;
-    position.at(5) = 2;
+    position.at(3) = 0;
+    position.at(4) = 0;
+    position.at(5) = 0;
     kvs::ValueArray<kvs::Real32> direction;
     direction.allocate(3*n_glyphs);
     direction.at(0) = 1;
-    direction.at(1) = 1;
-    direction.at(2) = 1;
-    direction.at(3) = 1;
-    direction.at(4) = 1;
-    direction.at(5) = 1;
- 
+    direction.at(1) = 0;
+    direction.at(2) = 0;
+    direction.at(3) = -1;
+    direction.at(4) = 0;
+    direction.at(5) = 0;
+
     // Create an sphere glyph polygon.
 //    kvs::PolygonObject* glyph_polygon = new kvs::SphereGlyph( n_glyphs, position );
 
