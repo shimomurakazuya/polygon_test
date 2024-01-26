@@ -124,7 +124,7 @@ ArrowGlyph::ArrowGlyph( const int nglyphs, const kvs::ValueArray<kvs::Real32>& p
     this->setNormalType( kvs::ArrowGlyph::VertexNormal );
     
     this->GenerateNormalizedPolygon();
-    this->Transform(nglyphs, position, direction, m_size ); //  rotate_scaling_tanslate;
+    this->Transform(nglyphs, position, direction, m_color, m_size ); //  rotate_scaling_tanslate;
 }
 
 
@@ -721,6 +721,7 @@ void  ArrowGlyph::GenerateNormalizedPolygon()
 void ArrowGlyph::Transform(const int nglyphs,
                            const kvs::ValueArray<kvs::Real32>& position,
                            const kvs::ValueArray<kvs::Real32>& direction,
+                           const kvs::RGBColor color,
                            const kvs::Real32 m_size )
 {
 

@@ -37,12 +37,12 @@ int main( int argc, char** argv )
     // 4 debug
     kvs::ValueArray<kvs::Real32> position;
     position.allocate(3*n_glyphs);
-    position.at(0) = 2;
-    position.at(1) = 2;
-    position.at(2) = 2;
-    position.at(3) = 0;
-    position.at(4) = 0;
-    position.at(5) = 0;
+    position.at(0) = 0;
+    position.at(1) = 0;
+    position.at(2) = 0;
+    position.at(3) = 2;
+    position.at(4) = 2;
+    position.at(5) = 2;
     kvs::ValueArray<kvs::Real32> direction;
     direction.allocate(3*n_glyphs);
     direction.at(0) = 1;

@@ -89,7 +89,8 @@ public:
     void Transform(const int nglyphs,
                    const kvs::ValueArray<kvs::Real32>& position,
                    const kvs::ValueArray<kvs::Real32>& direction,
-                   const kvs::Real32 m_size );
+                   const kvs::RGBColor color,
+                   const kvs::Real32 size );
     ArrowType type() const { return m_type; }
     void exec( kvs::ObjectBase* object, kvs::Camera* camera, kvs::Light* light );
 
