@@ -20,6 +20,7 @@
 #include <kvs/Type>
 #include <kvs/OpenGL>
 #include <kvs/PolygonObject>
+#include <kvs/Quaternion>
 
 
 namespace kvs
@@ -57,26 +58,38 @@ private:
     const kvs::VolumeObjectBase* m_volume; ///< pointer to the volume object (reference)
     kvs::ValueArray<kvs::Real32> m_position;
     //kvs::Vector3f m_position = kvs::Vector3f( 0.f, 0.f, 0.f);
-    kvs::Real32   m_size = 1.0f;
-    kvs::RGBColor m_color = kvs::RGBColor( 255, 255, 255 ); 
-    kvs::UInt8 m_opacity = 255;
-    int m_glyph_num = 1;
+    kvs::Real32   m_size;
+    kvs::RGBColor m_color; 
+    kvs::UInt8 m_opacity;
+    int m_glyph_num;
+    kvs::ValueArray<kvs::Real32> m_directions;
+    kvs::ValueArray<kvs::Real32> m_coords;
+    kvs::ValueArray<kvs::UInt32> m_connection;
+    kvs::ValueArray<kvs::Real32> m_normal;
+
 
 public:
 
     ArrowGlyph();
     ArrowGlyph( const kvs::VolumeObjectBase* volume );
     ArrowGlyph( const kvs::VolumeObjectBase* volume, const kvs::TransferFunction& transfer_function );
-    ArrowGlyph( const int nglyphs, const kvs::ValueArray<kvs::Real32>& position );
+    ArrowGlyph( const int nglyphs, const kvs::ValueArray<kvs::Real32>& position, const kvs::ValueArray<kvs::Real32>& direction);
 
     void setType( const ArrowType type ) { m_type = type; }
     //void setPosition(const kvs::Vector3f position ){ m_position = position;}
     void setPosition(const kvs::ValueArray<kvs::Real32>& position ){m_position = position;}
-    void setSphereSize(const kvs::Real32 size ){ m_size = size; }
+    void setSize(const kvs::Real32 size ){ m_size = size; }
     void setRGBColor(const kvs::RGBColor color ){ m_color = color ;}
     void setOpacity(const kvs::UInt8 opacity ){ m_opacity = opacity ;}
     void setGlyphNum(const int glyph_num ) { m_glyph_num = glyph_num;}
-    void ConvertPolygon();
+    //void setDirection()
+    //void ConvertPolygon();
+    void setPolygon(); 
+    void GenerateNormalizedPolygon();
+    void Transform(const int nglyphs,
+                   const kvs::ValueArray<kvs::Real32>& position,
+                   const kvs::ValueArray<kvs::Real32>& direction,
+                   const kvs::Real32 m_size );
     ArrowType type() const { return m_type; }
     void exec( kvs::ObjectBase* object, kvs::Camera* camera, kvs::Light* light );
 

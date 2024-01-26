@@ -14,6 +14,7 @@
 /*****************************************************************************/
 #include "ArrowGlyph.h"
 #include <kvs/OpenGL>
+#include <kvs/Quaternion>
 #include <kvs/IgnoreUnusedVariable>
 
 namespace
@@ -112,18 +113,18 @@ ArrowGlyph::ArrowGlyph(
  *  @param  volume [in] number of glyphs & positions
  */
 /*===========================================================================*/
-ArrowGlyph::ArrowGlyph( const int nglyphs, const kvs::ValueArray<kvs::Real32>& position ):
+ArrowGlyph::ArrowGlyph( const int nglyphs, const kvs::ValueArray<kvs::Real32>& position, const kvs::ValueArray<kvs::Real32>& direction ):
     kvs::GlyphBase(),
     m_size(1.0f),
     m_opacity( 255),
+    m_color(kvs::RGBColor(255, 0, 0 )),
     m_glyph_num(nglyphs)
 {
-    kvs::RGBColor color(255, 255, 255 );
-    this->setPosition( position );
-    this->setRGBColor( color);
     this->setType( kvs::ArrowGlyph::TubeArrow );
     this->setNormalType( kvs::ArrowGlyph::VertexNormal );
-    this->ConvertPolygon();
+    
+    this->GenerateNormalizedPolygon();
+    this->Transform(nglyphs, position, direction, m_size ); //  rotate_scaling_tanslate;
 }
 
 
@@ -420,318 +421,486 @@ void ArrowGlyph::draw_tube_element( const kvs::RGBColor& color, const kvs::UInt8
 }
 
 
-void  ArrowGlyph::ConvertPolygon()
+void  ArrowGlyph::GenerateNormalizedPolygon()
 {
-    const GLdouble radius = static_cast<GLdouble>( m_size );
-    const kvs::Real32 R = -90.0f; // rotation angle
-    const kvs::Vec3 V( 1.0f, 0.0f, 0.0f ); // rotation vector
-    const kvs::Vec3 T0( 0.0f, 0.0f, 0.7f ); // translation vector (cone)
-    const kvs::Vec3 T1( 0.0f, 0.0f, 0.0f ); // translation vector (cylinder)
 
+    const kvs::Vec3 T0( 0.0f, 0.0f, 0.7f ); // translation vector (cone)
+                                            //    const kvs::Vec3 T1( 0.0f, 0.0f, 0.0f ); // translation vector (cylinder)
+
+    int  n_coords_cone= 126;
+    int  n_coords_tube= 63; 
     int  n_coords     = 189; // =(20+1)*(5+1) + (20+1)*(2+1)
     int  n_cells      = 294; // =2*((20+1)*5+(20+1)*2)
     int  n_connection = 3 * n_cells;          //tri cell type
+
     kvs::ValueArray<kvs::Real32> local_coords;
     kvs::ValueArray<kvs::UInt32> local_connection;
     kvs::ValueArray<kvs::Real32> local_normal;
-    local_coords.allocate(m_glyph_num*3*n_coords);
-    local_normal.allocate(m_glyph_num*3*n_coords);
-    local_connection.allocate(m_glyph_num*n_connection);
+
+    //local_coords.allocate(m_glyph_num*3*n_coords);
+    //local_normal.allocate(m_glyph_num*3*n_coords);
+    //local_connection.allocate(m_glyph_num*n_connection);
+    local_coords.allocate(3*n_coords);
+    local_normal.allocate(3*n_coords);
+    local_connection.allocate(n_connection);
+    m_coords.allocate(3*n_coords);
+    m_normal.allocate(3*n_coords);
+    m_connection.allocate(n_connection); 
 
     int coord_id = 0;
     int connection_id = 0;
 
-    //kvs::OpenGL::Rotate( R, V );
-    for (int gly_id = 0; gly_id<m_glyph_num; gly_id++ )
+    // Cone.
+    //        ::DrawCone( T0 );
+    //    kvs::OpenGL::Translate( t ); //use T0(( 0.0f, 0.0f, 0.7f ))
+    //    kvs::OpenGL::DrawCylinder( base, top, height, slices, stacks );
+    GLdouble base = 0.15;
+    GLdouble top = 0.0;
+    GLdouble height = 0.3;
+    GLint slices = 20;
+    GLint stacks = 5;
+
+    const int CacheSize = 240;
+    const float Pi = 3.14159265358979323846;
+
+    GLint i,j;
+    GLfloat sinCache[CacheSize];
+    GLfloat cosCache[CacheSize];
+    GLfloat sinCache2[CacheSize];
+    GLfloat cosCache2[CacheSize];
+    GLfloat sinCache3[CacheSize];
+    GLfloat cosCache3[CacheSize];
+    GLfloat angle;
+    GLfloat zLow, zHigh;
+    GLfloat length;
+    GLfloat deltaRadius;
+    GLfloat zNormal;
+    GLfloat xyNormalRatio;
+    GLfloat radiusLow, radiusHigh;
+    int needCache2, needCache3;
+
+    if (slices >= CacheSize) slices = CacheSize-1;
+
+    if (slices < 2 || stacks < 1 || base < 0.0 || top < 0.0 || height < 0.0)
     {
-
-        GLfloat t_x = m_position.at(gly_id*3 + 0);
-        GLfloat t_y = m_position.at(gly_id*3 + 1);
-        GLfloat t_z = m_position.at(gly_id*3 + 2);
-        // Cone.
-        //        ::DrawCone( T0 );
-        GLdouble base = 0.15;
-        GLdouble top = 0.0;
-        GLdouble height = 0.3;
-        GLint slices = 20;
-        GLint stacks = 5;
-
-        //    kvs::OpenGL::Translate( t ); //use T0(( 0.0f, 0.0f, 0.7f ))
-        //    kvs::OpenGL::DrawCylinder( base, top, height, slices, stacks );
-        const int CacheSize = 240;
-        const float Pi = 3.14159265358979323846;
-
-        GLint i,j;
-        GLfloat sinCache[CacheSize];
-        GLfloat cosCache[CacheSize];
-        GLfloat sinCache2[CacheSize];
-        GLfloat cosCache2[CacheSize];
-        GLfloat sinCache3[CacheSize];
-        GLfloat cosCache3[CacheSize];
-        GLfloat angle;
-        GLfloat zLow, zHigh;
-        GLfloat length;
-        GLfloat deltaRadius;
-        GLfloat zNormal;
-        GLfloat xyNormalRatio;
-        GLfloat radiusLow, radiusHigh;
-        int needCache2, needCache3;
-
-        if (slices >= CacheSize) slices = CacheSize-1;
-
-        if (slices < 2 || stacks < 1 || base < 0.0 || top < 0.0 || height < 0.0)
-        {
-            kvsMessageError("Invalid value.");
-            return;
-        }
-
-        /* Compute length (needed for normal calculations) */
-        deltaRadius = base - top;
-        length = std::sqrt(deltaRadius*deltaRadius + height*height);
-        if ( length == 0.0 )
-        {
-            kvsMessageError("Invalid value.");
-            return;
-        }
-
-        /* Cache is the vertex locations cache */
-        /* Cache2 is the various normals at the vertices themselves */
-        /* Cache3 is the various normals for the faces */
-        needCache2 = 1;
-        needCache3 = 0;
-
-        zNormal = deltaRadius / length;
-        xyNormalRatio = height / length;
-
-        for (i = 0; i < slices; i++)
-        {
-            angle = 2 * Pi * i / slices;
-            if (needCache2)
-            {
-                sinCache2[i] = xyNormalRatio * std::sin(angle);
-                cosCache2[i] = xyNormalRatio * std::cos(angle);
-            }
-            sinCache[i] = std::sin(angle);
-            cosCache[i] = std::cos(angle);
-        }
-
-        if (needCache3)
-        {
-            for (i = 0; i < slices; i++)
-            {
-                angle = 2 * Pi * (i-0.5) / slices;
-                sinCache3[i] = xyNormalRatio * std::sin(angle);
-                cosCache3[i] = xyNormalRatio * std::cos(angle);
-            }
-        }
-
-        sinCache[slices] = sinCache[0];
-        cosCache[slices] = cosCache[0];
-        if (needCache2)
-        {
-            sinCache2[slices] = sinCache2[0];
-            cosCache2[slices] = cosCache2[0];
-        }
-        if (needCache3)
-        {
-            sinCache3[slices] = sinCache3[0];
-            cosCache3[slices] = cosCache3[0];
-        }
-
-        /* Note:
-         ** An argument could be made for using a TRIANGLE_FAN for the end
-         ** of the cylinder of either radii is 0.0 (a cone).  However, a
-         ** TRIANGLE_FAN would not work in smooth shading mode (the common
-         ** case) because the normal for the apex is different for every
-         ** triangle (and TRIANGLE_FAN doesn't let me respecify that normal).
-         ** Now, my choice is GL_TRIANGLES, or leave the GL_QUAD_STRIP and
-         ** just let the GL trivially reject one of the two triangles of the
-         ** QUAD.  GL_QUAD_STRIP is probably faster, so I will leave this code
-         ** alone.
-         */
-        for (j = 0; j <= stacks; j++)
-        {
-            zLow = j * height / stacks;
-            //        zHigh = (j + 1) * height / stacks;
-            radiusLow = base - deltaRadius * ((float) j / stacks);
-            //        radiusHigh = base - deltaRadius * ((float) (j + 1) / stacks);
-
-            for (i = 0; i <= slices; i++)
-            {
-                //add by shimomura
-                local_coords.at(coord_id   ) = t_x + T0.x() + radiusLow  * sinCache[i];
-                local_coords.at(coord_id +1) = t_y + T0.y() + radiusLow  * cosCache[i];
-                local_coords.at(coord_id +2) = t_z + T0.z() + zLow;
-
-                local_normal.at(coord_id   ) = sinCache2[i] ;
-                local_normal.at(coord_id +1) = cosCache2[i] ;
-                local_normal.at(coord_id +2) = zNormal;
-                coord_id      +=3;
-            }
-        }
-        std::cout  <<  __PRETTY_FUNCTION__ <<" : "<<__LINE__ << std::endl;
-        int line_size = slices + 1;
-        int vertex_index = 0;  
-        for (j = 0; j < stacks; j++)
-        {
-            for (i = 0; i <= slices; i++)
-            {
-                const int local_vertex_index[4] =
-                {   
-                    vertex_index,
-                    vertex_index + 1,
-                    vertex_index + line_size,
-                    vertex_index + line_size + 1
-                }; 
-                local_connection.at(connection_id  ) = gly_id*n_coords +(local_vertex_index[0]); 
-                local_connection.at(connection_id+1) = gly_id*n_coords +(local_vertex_index[2]); 
-                local_connection.at(connection_id+2) = gly_id*n_coords +(local_vertex_index[1]); 
-
-                local_connection.at(connection_id+3) = gly_id*n_coords +(local_vertex_index[2]); 
-                local_connection.at(connection_id+4) = gly_id*n_coords +(local_vertex_index[3]); 
-                local_connection.at(connection_id+5) = gly_id*n_coords +(local_vertex_index[1]); 
-                connection_id += 6;
-                vertex_index++;  
-            }
-        }
-
-        // Cylinder.
-        //::DrawCylinder( T1 ) // use T1( 0.0f, 0.0f, 0.0f );
-         base = 0.07;
-         top = 0.07;
-         height = 0.7;
-         slices = 20;
-         stacks = 2;
-
-        /* Compute length (needed for normal calculations) */
-        deltaRadius = base - top;
-        length = std::sqrt(deltaRadius*deltaRadius + height*height);
-        if ( length == 0.0 )
-        {
-            kvsMessageError("Invalid value.");
-            return;
-        }
-
-        /* Cache is the vertex locations cache */
-        /* Cache2 is the various normals at the vertices themselves */
-        /* Cache3 is the various normals for the faces */
-        needCache2 = 1;
-        needCache3 = 0;
-
-        zNormal = deltaRadius / length;
-        xyNormalRatio = height / length;
-
-        for (i = 0; i < slices; i++)
-        {
-            angle = 2 * Pi * i / slices;
-            if (needCache2)
-            {
-                sinCache2[i] = xyNormalRatio * std::sin(angle);
-                cosCache2[i] = xyNormalRatio * std::cos(angle);
-            }
-            sinCache[i] = std::sin(angle);
-            cosCache[i] = std::cos(angle);
-        }
-
-        if (needCache3)
-        {
-            for (i = 0; i < slices; i++)
-            {
-                angle = 2 * Pi * (i-0.5) / slices;
-                sinCache3[i] = xyNormalRatio * std::sin(angle);
-                cosCache3[i] = xyNormalRatio * std::cos(angle);
-            }
-        }
-
-        sinCache[slices] = sinCache[0];
-        cosCache[slices] = cosCache[0];
-        if (needCache2)
-        {
-            sinCache2[slices] = sinCache2[0];
-            cosCache2[slices] = cosCache2[0];
-        }
-        if (needCache3)
-        {
-            sinCache3[slices] = sinCache3[0];
-            cosCache3[slices] = cosCache3[0];
-        }
-
-        /* Note:
-         ** An argument could be made for using a TRIANGLE_FAN for the end
-         ** of the cylinder of either radii is 0.0 (a cone).  However, a
-         ** TRIANGLE_FAN would not work in smooth shading mode (the common
-         ** case) because the normal for the apex is different for every
-         ** triangle (and TRIANGLE_FAN doesn't let me respecify that normal).
-         ** Now, my choice is GL_TRIANGLES, or leave the GL_QUAD_STRIP and
-         ** just let the GL trivially reject one of the two triangles of the
-         ** QUAD.  GL_QUAD_STRIP is probably faster, so I will leave this code
-         ** alone.
-         */
-        for (j = 0; j <= stacks; j++)
-        {
-            zLow = j * height / stacks;
-            //        zHigh = (j + 1) * height / stacks;
-            radiusLow = base - deltaRadius * ((float) j / stacks);
-            //        radiusHigh = base - deltaRadius * ((float) (j + 1) / stacks);
-
-            for (i = 0; i <= slices; i++)
-            {
-                //add by shimomura
-                local_coords.at(coord_id   ) = t_x + radiusLow  * sinCache[i];
-                local_coords.at(coord_id +1) = t_y + radiusLow  * cosCache[i];
-                local_coords.at(coord_id +2) = t_z + zLow;
-
-                local_normal.at(coord_id   ) = sinCache2[i] ;
-                local_normal.at(coord_id +1) = cosCache2[i] ;
-                local_normal.at(coord_id +2) = zNormal;
-                coord_id      +=3;
-            }
-        }
-//        line_size = slices + 1;
-        vertex_index = 126; 
-        std::cout  << "vertex_index = " << vertex_index <<std::endl; 
-        for (j = 0; j < stacks; j++)
-        {
-            for (i = 0; i <= slices; i++)
-            {
-                const int local_vertex_index[4] =
-                {   
-                    vertex_index,
-                    vertex_index + 1,
-                    vertex_index + line_size,
-                    vertex_index + line_size + 1
-                }; 
-                local_connection.at(connection_id  ) = gly_id*n_coords +(local_vertex_index[0]); 
-                local_connection.at(connection_id+1) = gly_id*n_coords +(local_vertex_index[2]); 
-                local_connection.at(connection_id+2) = gly_id*n_coords +(local_vertex_index[1]); 
-
-                local_connection.at(connection_id+3) = gly_id*n_coords +(local_vertex_index[2]); 
-                local_connection.at(connection_id+4) = gly_id*n_coords +(local_vertex_index[3]); 
-                local_connection.at(connection_id+5) = gly_id*n_coords +(local_vertex_index[1]); 
-                connection_id += 6;
-                vertex_index++;  
-            }
-        }
-#if 0
-        std::cout << "connection_id = " << connection_id <<std::endl;
-        std::cout << "coord_id = " << coord_id <<std::endl;
-        std::cout << "object->coord()  = " << float(local_coords[0]) << ", " <<  float(local_coords[1]) << ", " << float(local_coords[2]) << ", "  << 
-            float(local_coords[402]) << ", " <<  float(local_coords[403]) << ", " << float(local_coords[404]) << ", " <<
-            float(local_coords[564]) << ", " <<  float(local_coords[565]) << ", " << float(local_coords[566]) << ", " << std::endl;
-        std::cout << "connection[id]  = " << float(local_connection[0]) << ", " <<  float(local_connection[1]) << ", " << float(local_connection[2]) << ", "  << 
-            float(local_connection[879]) << ", " <<  float(local_connection[880]) << ", " << float(local_connection[881]) << ", " << std::endl;
-#endif 
+        kvsMessageError("Invalid value.");
+        return;
     }
 
-    SuperClass::setCoords( local_coords  ); 
-    SuperClass::setConnections( local_connection );
+    /* Compute length (needed for normal calculations) */
+    deltaRadius = base - top;
+    length = std::sqrt(deltaRadius*deltaRadius + height*height);
+    if ( length == 0.0 )
+    {
+        kvsMessageError("Invalid value.");
+        return;
+    }
+
+    /* Cache is the vertex locations cache */
+    /* Cache2 is the various normals at the vertices themselves */
+    /* Cache3 is the various normals for the faces */
+    needCache2 = 1;
+    needCache3 = 0;
+
+    zNormal = deltaRadius / length;
+    xyNormalRatio = height / length;
+
+    for (i = 0; i < slices; i++)
+    {
+        angle = 2 * Pi * i / slices;
+        if (needCache2)
+        {
+            sinCache2[i] = xyNormalRatio * std::sin(angle);
+            cosCache2[i] = xyNormalRatio * std::cos(angle);
+        }
+        sinCache[i] = std::sin(angle);
+        cosCache[i] = std::cos(angle);
+    }
+
+    if (needCache3)
+    {
+        for (i = 0; i < slices; i++)
+        {
+            angle = 2 * Pi * (i-0.5) / slices;
+            sinCache3[i] = xyNormalRatio * std::sin(angle);
+            cosCache3[i] = xyNormalRatio * std::cos(angle);
+        }
+    }
+
+    sinCache[slices] = sinCache[0];
+    cosCache[slices] = cosCache[0];
+    if (needCache2)
+    {
+        sinCache2[slices] = sinCache2[0];
+        cosCache2[slices] = cosCache2[0];
+    }
+    if (needCache3)
+    {
+        sinCache3[slices] = sinCache3[0];
+        cosCache3[slices] = cosCache3[0];
+    }
+
+    /* Note:
+     ** An argument could be made for using a TRIANGLE_FAN for the end
+     ** of the cylinder of either radii is 0.0 (a cone).  However, a
+     ** TRIANGLE_FAN would not work in smooth shading mode (the common
+     ** case) because the normal for the apex is different for every
+     ** triangle (and TRIANGLE_FAN doesn't let me respecify that normal).
+     ** Now, my choice is GL_TRIANGLES, or leave the GL_QUAD_STRIP and
+     ** just let the GL trivially reject one of the two triangles of the
+     ** QUAD.  GL_QUAD_STRIP is probably faster, so I will leave this code
+     ** alone.
+     */
+    for (j = 0; j <= stacks; j++)
+    {
+        zLow = j * height / stacks;
+        radiusLow = base - deltaRadius * ((float) j / stacks);
+
+        for (i = 0; i <= slices; i++)
+        {
+            local_coords.at(coord_id   ) =  T0.x() + radiusLow  * sinCache[i];
+            local_coords.at(coord_id +1) =  T0.y() + radiusLow  * cosCache[i];
+            local_coords.at(coord_id +2) =  T0.z() + zLow;
+
+            local_normal.at(coord_id   ) = sinCache2[i] ;
+            local_normal.at(coord_id +1) = cosCache2[i] ;
+            local_normal.at(coord_id +2) = zNormal;
+            coord_id      +=3;
+        }
+    }
+    std::cout  <<  __PRETTY_FUNCTION__ <<" : "<<__LINE__ << std::endl;
+    int line_size = slices + 1;
+    int vertex_index = 0;  
+    for (j = 0; j < stacks; j++)
+    {
+        for (i = 0; i <= slices; i++)
+        {
+            const int local_vertex_index[4] =
+            {   
+                vertex_index,
+                vertex_index + 1,
+                vertex_index + line_size,
+                vertex_index + line_size + 1
+            }; 
+            local_connection.at(connection_id  ) = local_vertex_index[0]; 
+            local_connection.at(connection_id+1) = local_vertex_index[2]; 
+            local_connection.at(connection_id+2) = local_vertex_index[1]; 
+
+            local_connection.at(connection_id+3) = local_vertex_index[2]; 
+            local_connection.at(connection_id+4) = local_vertex_index[3]; 
+            local_connection.at(connection_id+5) = local_vertex_index[1]; 
+            connection_id += 6;
+            vertex_index++;  
+        }
+    }
+
+    // Cylinder.
+    //::DrawCylinder( T1 ) // use T1( 0.0f, 0.0f, 0.0f );
+    base = 0.07;
+    top = 0.07;
+    height = 0.7;
+    slices = 20;
+    stacks = 2;
+
+    /* Compute length (needed for normal calculations) */
+    deltaRadius = base - top;
+    length = std::sqrt(deltaRadius*deltaRadius + height*height);
+    if ( length == 0.0 )
+    {
+        kvsMessageError("Invalid value.");
+        return;
+    }
+
+    /* Cache is the vertex locations cache */
+    /* Cache2 is the various normals at the vertices themselves */
+    /* Cache3 is the various normals for the faces */
+    needCache2 = 1;
+    needCache3 = 0;
+
+    zNormal = deltaRadius / length;
+    xyNormalRatio = height / length;
+
+    for (i = 0; i < slices; i++)
+    {
+        angle = 2 * Pi * i / slices;
+        if (needCache2)
+        {
+            sinCache2[i] = xyNormalRatio * std::sin(angle);
+            cosCache2[i] = xyNormalRatio * std::cos(angle);
+        }
+        sinCache[i] = std::sin(angle);
+        cosCache[i] = std::cos(angle);
+    }
+
+    if (needCache3)
+    {
+        for (i = 0; i < slices; i++)
+        {
+            angle = 2 * Pi * (i-0.5) / slices;
+            sinCache3[i] = xyNormalRatio * std::sin(angle);
+            cosCache3[i] = xyNormalRatio * std::cos(angle);
+        }
+    }
+
+    sinCache[slices] = sinCache[0];
+    cosCache[slices] = cosCache[0];
+    if (needCache2)
+    {
+        sinCache2[slices] = sinCache2[0];
+        cosCache2[slices] = cosCache2[0];
+    }
+    if (needCache3)
+    {
+        sinCache3[slices] = sinCache3[0];
+        cosCache3[slices] = cosCache3[0];
+    }
+
+    for (j = 0; j <= stacks; j++)
+    {
+        zLow = j * height / stacks;
+        radiusLow = base - deltaRadius * ((float) j / stacks);
+
+        for (i = 0; i <= slices; i++)
+        {
+            local_coords.at(coord_id   ) =  radiusLow  * sinCache[i];
+            local_coords.at(coord_id +1) =  radiusLow  * cosCache[i];
+            local_coords.at(coord_id +2) =  zLow;
+
+            local_normal.at(coord_id   ) = sinCache2[i] ;
+            local_normal.at(coord_id +1) = cosCache2[i] ;
+            local_normal.at(coord_id +2) = zNormal;
+            coord_id      +=3;
+        }
+    }
+    //        line_size = slices + 1;
+    vertex_index = 126; 
+    //       std::cout  << "vertex_index = " << vertex_index <<std::endl; 
+    for (j = 0; j < stacks; j++)
+    {
+        for (i = 0; i <= slices; i++)
+        {
+            const int local_vertex_index[4] =
+            {   
+                vertex_index,
+                vertex_index + 1,
+                vertex_index + line_size,
+                vertex_index + line_size + 1
+            }; 
+            local_connection.at(connection_id  ) = local_vertex_index[0]; 
+            local_connection.at(connection_id+1) = local_vertex_index[2]; 
+            local_connection.at(connection_id+2) = local_vertex_index[1]; 
+
+            local_connection.at(connection_id+3) = local_vertex_index[2]; 
+            local_connection.at(connection_id+4) = local_vertex_index[3]; 
+            local_connection.at(connection_id+5) = local_vertex_index[1]; 
+            connection_id += 6;
+            vertex_index++;  
+        }
+    }
+
+    m_coords = local_coords;
+    m_normal = local_normal;
+    m_connection = local_connection; 
+    //#if 0
+    std::cout << "connection_id = " << connection_id <<std::endl;
+    std::cout << "coord_id = " << coord_id <<std::endl;
+    std::cout << "object->coord()  = " << float(local_coords[0]) << ", " <<  float(local_coords[1]) << ", " << float(local_coords[2]) << ", "  << 
+        float(local_coords[402]) << ", " <<  float(local_coords[403]) << ", " << float(local_coords[404]) << ", " <<
+        float(local_coords[564]) << ", " <<  float(local_coords[565]) << ", " << float(local_coords[566]) << ", " << std::endl;
+    std::cout << "connection[id]  = " << float(local_connection[0]) << ", " <<  float(local_connection[1]) << ", " << float(local_connection[2]) << ", "  << 
+        float(local_connection[879]) << ", " <<  float(local_connection[880]) << ", " << float(local_connection[881]) << ", " << std::endl;
+    //#endif 
+
+#if 0
+//debug    
+//    SuperClass::setCoords( m_coords  ); 
+//    SuperClass::setConnections( m_connection );
+//    SuperClass::setColor( m_color );
+//    SuperClass::setNormals( m_normal );
+//    SuperClass::setOpacity( int(m_opacity) );
+//    SuperClass::setPolygonType( kvs::PolygonObject::Triangle );
+//    SuperClass::setColorType( kvs::PolygonObject::PolygonColor );
+#endif   
+}
+/*===========================================================================*/
+/**
+ *  @brief  translate & scaleing & rotate  arrow glyph.
+ */
+/*===========================================================================*/
+void ArrowGlyph::Transform(const int nglyphs,
+                           const kvs::ValueArray<kvs::Real32>& position,
+                           const kvs::ValueArray<kvs::Real32>& direction,
+                           const kvs::Real32 m_size )
+{
+
+    const int n_coords = m_coords.size();
+    const int n_connection = m_connection.size();
+
+    kvs::ValueArray<kvs::Real32> gl_coords;
+    kvs::ValueArray<kvs::UInt32> gl_connection;
+    kvs::ValueArray<kvs::Real32> gl_normal;
+    gl_coords.allocate(nglyphs*n_coords);
+    gl_normal.allocate(nglyphs*n_coords);
+    gl_connection.allocate(nglyphs*n_connection); 
+
+   
+    const float Pi = 3.14159265358979323846;
+    const kvs::Vec3 DefaultDirection = kvs::Vec3( 0.0, 1.0, 0.0 );
+//    const kvs::Real32 R = -0.5*Pi; //  -90.0f;              // rotation angle
+//    const kvs::Real32 R = 0.f; //  -90.0f;              // rotation angle
+    float R[2]={0.f, float(-0.5*Pi)}; //  -90.0f;              // rotation angle
+    const kvs::Vector3f V( 1.0f, 0.0f, 0.0f ); // rotation vector
+    for (int gly_id = 0; gly_id< nglyphs; gly_id++ )
+    {   
+        int glyph_cnt = gly_id * n_coords/3;
+        int index = 3*gly_id;
+
+        kvs::Vector3f dir(direction.at(gly_id),
+                          direction.at(gly_id+1),
+                          direction.at(gly_id+2));
+        // 4 translate & scaling
+        const kvs::Vector3f trans_direction = dir.normalized();
+        const kvs::Vec3 v = trans_direction.normalized();
+        const kvs::Vec3 c = DefaultDirection.cross( v );
+        const float d = DefaultDirection.dot( v );
+        const float s = static_cast<float>( std::sqrt( ( 1.0 + d ) * 2.0 ) );
+        const kvs::Quaternion q( c.x()/s, c.y()/s, c.z()/s, s/2.0f );
+        const kvs::Mat3 trans_scale = q.toMatrix();
+        const kvs::Vector3f trans_position(position.data()+ index);
+        std::cout << "trans_position = " << trans_position.x() << ", " << trans_position.y() << ", " << trans_position.z()  << std::endl;
+        const kvs::Xform xform_trans( trans_position, BaseClass::scale() * m_size, trans_scale );
+
+        // 4 rotate
+        //        kvs::OpenGL::Rotate( R, V );
+        float x= V.x();
+        float y= V.y();
+        float z= V.z();
+        float cos=std::cos(R[gly_id]);
+        float sin=std::sin(R[gly_id]);
+//        float cos=std::cos(R);
+//        float sin=std::sin(R);
+
+        kvs::Mat4 rot( x*x*(1.0f-cos)+cos, x*y*(1.0f-cos)-z*sin, x*z*(1.0f-cos)+y*sin, 0,
+                       y*x*(1.0f-cos)*-z*sin, y*y*(1.0f-cos)+cos,y*z*(1.0f-cos)-x*sin, 0,
+                       x*z*(1.0f-cos)*-y*sin, y*z*(1.0f-cos)+x*sin, z*z*(1.0f-cos)+cos,0,
+                       0, 0, 0, 1); 
+        kvs::Xform xform_rot(rot);
+
+//        for (int i =0; i< 4; i++)
+//        {
+//            std::cout << "rot[0]["<< i<<"]="<< rot[0][i] << std::endl;
+//            std::cout << "rot[1]["<< i<<"]="<< rot[1][i] << std::endl;
+//            std::cout << "rot[2]["<< i<<"]="<< rot[2][i] << std::endl;
+//            std::cout << "rot[3]["<< i<<"]="<< rot[3][i] << std::endl;
+//        }
+        for (int id = 0; id < n_coords; id +=3)
+        {
+            kvs::Vec3 co(m_coords.at(id), m_coords.at(id+1), m_coords.at(id+2)); 
+            kvs::Vec3 co_normal(m_normal.at(id), m_normal.at(id+1), m_normal.at(id+2)); 
+
+//            //rotate
+//            co        = co*xform_rot.rotation();
+//            co_normal = co_normal*xform_rot.rotation(); 
+            kvs::Vec3 rot;        
+            kvs::Vec3 rot_normal; 
+            rot        = co*xform_rot.rotation(); 
+            rot_normal = co_normal*xform_rot.rotation(); 
+
+            //scale & translate
+            co        = xform_trans.transform(rot);
+            co_normal = xform_trans.transformNormal(rot_normal);
+//            co        = xform_trans.transform(co);
+//            co_normal = xform_trans.transformNormal(co_normal);
+
+ 
+//            //  translate
+//            kvs::Vec3 trans;  
+//            trans = co + xform_trans.translation();
+//
+//            //  scale
+//            kvs::Vec3 scale_factor         =xform_trans.scaling();
+//            kvs::Vec3 scale_factor_inverse (1/xform_trans.scaling().x(), 1/xform_trans.scaling().y(), 1/xform_trans.scaling().z());
+//
+//            kvs::Vec3 scale        = trans*scale_factor;
+//            kvs::Vec3 scale_normal = co_normal*scale_factor_inverse;
+//
+//            //rotate 
+//            kvs::Vec3 rot        = scale*xform_rot.rotation(); 
+//            kvs::Vec3 rot_normal = scale_normal*xform_rot.rotation(); 
+
+            // set global value
+            gl_coords.at(gly_id*n_coords+id  )= co[0]; 
+            gl_coords.at(gly_id*n_coords+id+1)= co[1]; 
+            gl_coords.at(gly_id*n_coords+id+2)= co[2]; 
+            gl_normal.at(gly_id*n_coords+id  )= co_normal[0]; 
+            gl_normal.at(gly_id*n_coords+id+1)= co_normal[1]; 
+            gl_normal.at(gly_id*n_coords+id+2)= co_normal[2]; 
+        }
+        
+        for (int id = 0;id < n_connection; id+=3 )
+        {
+            gl_connection.at(gly_id*n_connection+id  )= m_connection[id+0]+glyph_cnt; 
+            gl_connection.at(gly_id*n_connection+id+1)= m_connection[id+1]+glyph_cnt; 
+            gl_connection.at(gly_id*n_connection+id+2)= m_connection[id+2]+glyph_cnt; 
+        }
+    std::cout << "nglyphs*n_connection = " << nglyphs*n_connection <<std::endl; 
+    std::cout << "glyph_cnt= " << glyph_cnt  <<std::endl; 
+    }
+
+    m_coords.allocate(gl_coords.size());
+    m_normal.allocate(gl_normal.size());
+    m_connection.allocate(gl_connection.size()); 
+
+    m_coords = gl_coords;
+    m_normal = gl_normal;
+    m_connection = gl_connection;
+
+//#ifdef DEBUG
+    std::cout << "object->coord()  = " << float(gl_coords[0]) << ", " <<  float(gl_coords[1]) << ", " << float(gl_coords[2]) << ", "  << 
+        float(gl_coords[402]) << ", " <<  float(gl_coords[403]) << ", " << float(gl_coords[404]) << ", " <<
+        float(gl_coords[564]) << ", " <<  float(gl_coords[565]) << ", " << float(gl_coords[566]) << ", " << std::endl;
+    std::cout << "m_coord()  = " << float(m_coords[0]) << ", " <<  float(m_coords[1]) << ", " << float(m_coords[2]) << ", "  << 
+        float(m_coords[402]) << ", " <<  float(m_coords[403]) << ", " << float(m_coords[404]) << ", " <<
+        float(m_coords[882]) << ", " <<  float(m_coords[883]) << ", " << float(m_coords[884]) << ", " << std::endl;
+    std::cout << "connection[id]  = " << float(gl_connection[0]) << ", " <<  float(gl_connection[1]) << ", " << float(gl_connection[2]) << ", "  << 
+        float(gl_connection[879]) << ", " <<  float(gl_connection[880]) << ", " << float(gl_connection[881]) << ", " << std::endl;
+    std::cout << "m_connection[id]  = " << float(m_connection[0]) << ", " <<  float(m_connection[1]) << ", " << float(m_connection[2]) << ", "  << 
+        float(m_connection[879]) << ", " <<  float(m_connection[880]) << ", " << float(m_connection[881]) << ", " << std::endl;
+    std::cout << "connection[id]  = " << float(gl_connection[882]) << ", " <<  float(gl_connection[883]) << ", " << float(gl_connection[884]) << ", "  << 
+        float(gl_connection[1761]) << ", " <<  float(gl_connection[1762]) << ", " << float(gl_connection[1763]) << ", " << std::endl;
+    std::cout  <<  __PRETTY_FUNCTION__ <<" : "<<__LINE__ << std::endl;
+//#endif
+
+    // set polygon
+    SuperClass::setCoords( m_coords  ); 
+    SuperClass::setConnections( m_connection );
     SuperClass::setColor( m_color );
-    SuperClass::setNormals( local_normal );
+    SuperClass::setNormals( m_normal );
     SuperClass::setOpacity( int(m_opacity) );
     SuperClass::setPolygonType( kvs::PolygonObject::Triangle );
     SuperClass::setColorType( kvs::PolygonObject::PolygonColor );
-
 }
+
+/*===========================================================================*/
+/**
+ *  @brief  setting arrow glyph polygon.
+ */
+/*===========================================================================*/
+//void ArrowGlyph::setPolygon()
+//{
+////    変換後に格納
+//    SuperClass::setCoords( m_coords  ); 
+//    SuperClass::setConnections( m_connection );
+//    SuperClass::setColor( m_color );
+//    SuperClass::setNormals( m_normal );
+//    SuperClass::setOpacity( int(m_opacity) );
+//    SuperClass::setPolygonType( kvs::PolygonObject::Triangle );
+//    SuperClass::setColorType( kvs::PolygonObject::PolygonColor );
+//    std::cout  <<  __PRETTY_FUNCTION__ <<" : "<<__LINE__ << std::endl;
+////#endif
+//
+//}
+
 /*===========================================================================*/
 /**
  *  @brief  Initialize OpenGL properties for rendering arrow glyph.
