@@ -32,16 +32,16 @@ int main( int argc, char** argv )
      */
 
     // グリフポリゴン表示に関係あるのは glyphのコンストラクターとsetpolygon()と各種セッターのみ
-    int n_glyphs = 1;
+    int n_glyphs = 2;
     // 4 debug
     kvs::ValueArray<kvs::Real32> pos;
     pos.allocate(3*n_glyphs);
     pos.at(0) = 0;
     pos.at(1) = 0;
     pos.at(2) = 0;
-    //pos.at(3) = 0;
-    //pos.at(4) = 0;
-    //pos.at(5) = 3;
+    pos.at(3) = 0;
+    pos.at(4) = 0;
+    pos.at(5) = 3;
   
     // Create an sphere glyph polygon.
     kvs::PolygonObject* glyph_polygon = new kvs::SphereGlyph( n_glyphs, pos );

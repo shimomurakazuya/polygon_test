@@ -15,6 +15,7 @@
 #include "SphereGlyph.h"
 #include <kvs/OpenGL>
 #include <kvs/IgnoreUnusedVariable>
+#include <kvs/Quaternion>
 
 
 namespace kvs
@@ -89,17 +90,20 @@ SphereGlyph::SphereGlyph( const int nglyphs, const kvs::ValueArray<kvs::Real32>&
     m_nslices( 10 ),
     m_nstacks( 10 ),
     m_opacity( 255),
+    m_color(kvs::RGBColor(255, 255, 255 )),
     m_size(1.0f),
     m_glyph_num(nglyphs)
 {
-//    this->setGlyphNum(nglyphs); //
-//    this->setSphereSize( 1.0f );//　球サイズ
-//    this->setOpacity(255); //透明度　min:0 max:255
-    kvs::RGBColor color(255, 255, 255 ); // 色
-    this->setPosition( position );　
-    this->setRGBColor( color);
-    this -> setNormalType(kvs::SphereGlyph::VertexNormal);
-    this -> setpolygon();
+    // debug 
+    kvs::ValueArray<kvs::Real32> sizes(2);
+    sizes[0] =1.f;
+    sizes[1] =2.f;
+    //
+    
+    this-> setSizes(sizes); 
+    this-> setNormalType(kvs::SphereGlyph::VertexNormal);
+    this-> GeneratedNormalizedPolygon();
+    this-> Transform(nglyphs, position, m_color, BaseClass::sizes() );
 }
 
 ///*===========================================================================*/
@@ -342,15 +346,15 @@ void SphereGlyph::attach_volume( const kvs::VolumeObjectBase* volume )
         BaseClass::calculateOpacities<kvs::Real64>( volume );
     }
 }
-
-//------------polygon object-------------
-//----------output polygon format---------
-//----------------------------------------
+/*===========================================================================*/
+/**
+ *  @brief  generate the normalized sphere glyph polygon.
+ */
+/*===========================================================================*/
 //# if 0
-void SphereGlyph::setpolygon()
+void SphereGlyph::GeneratedNormalizedPolygon()
 {
-    //const GLdouble radius = 0.5;
-    const GLdouble radius = static_cast<GLdouble>( m_size );
+    const GLdouble radius = 0.5;
      GLint slices = static_cast<GLint>( m_nslices );
      GLint stacks = static_cast<GLint>( m_nstacks );
 
@@ -462,14 +466,15 @@ void SphereGlyph::setpolygon()
     kvs::ValueArray<kvs::Real32> local_coords;
     kvs::ValueArray<kvs::UInt32> local_connection;
     kvs::ValueArray<kvs::Real32> local_normal;
-    local_coords.allocate(m_glyph_num*3*n_coords);
-    local_normal.allocate(m_glyph_num*3*n_coords);
-    local_connection.allocate(m_glyph_num*n_connection);
+    local_coords.allocate(3*n_coords);
+    local_normal.allocate(3*n_coords);
+    local_connection.allocate(n_connection);
+    m_coords.allocate(3*n_coords);
+    m_normal.allocate(3*n_coords);
+    m_connection.allocate(n_connection);
 
     int coord_id = 0;
     int connection_id = 0;
-    for (int gly_id = 0; gly_id<m_glyph_num; gly_id++ )
-    {
         start = 1;
         finish = stacks - 1;
         sintemp2 = sinCache1b[1];
@@ -477,13 +482,9 @@ void SphereGlyph::setpolygon()
         sintemp3 = sinCache2b[1];
         costemp3 = cosCache2b[1];
 
-        GLfloat t_x = m_position.at(gly_id*3 + 0);
-        GLfloat t_y = m_position.at(gly_id*3 + 1);
-        GLfloat t_z = m_position.at(gly_id*3 + 2);
-        //#if 0
-        local_coords.at(coord_id   ) = t_x + 0.0;
-        local_coords.at(coord_id +1) = t_y + 0.0;
-        local_coords.at(coord_id +2) = t_z + radius;
+        local_coords.at(coord_id   ) = 0.0;
+        local_coords.at(coord_id +1) = 0.0;
+        local_coords.at(coord_id +2) = radius;
         local_normal.at(coord_id   ) = sinCache2a[0] * sinCache2b[0];
         local_normal.at(coord_id +1) = cosCache2a[0] * sinCache2b[0];
         local_normal.at(coord_id +2) = cosCache2b[0];
@@ -492,9 +493,9 @@ void SphereGlyph::setpolygon()
         for (i = slices; i >= 0; i--)
         {
             //add by shimomura
-            local_coords.at(coord_id   ) = t_x + sintemp2 * sinCache1a[i];
-            local_coords.at(coord_id +1) = t_y + sintemp2 * cosCache1a[i];
-            local_coords.at(coord_id +2) = t_z + zHigh;
+            local_coords.at(coord_id   ) = sintemp2 * sinCache1a[i];
+            local_coords.at(coord_id +1) = sintemp2 * cosCache1a[i];
+            local_coords.at(coord_id +2) = zHigh;
             local_normal.at(coord_id   ) = sinCache2a[i] * sintemp3;
             local_normal.at(coord_id +1) = cosCache2a[i] * sintemp3;
             local_normal.at(coord_id +2) = costemp3;
@@ -503,12 +504,11 @@ void SphereGlyph::setpolygon()
 
         for (i = 0; i < slices; i++)
         {
-            local_connection.at(connection_id)   = gly_id*n_coords + 0;
-            local_connection.at(connection_id+1) = gly_id*n_coords + i+1;
-            local_connection.at(connection_id+2) = gly_id*n_coords + i+2;
+            local_connection.at(connection_id)   =  0;
+            local_connection.at(connection_id+1) =  i+1;
+            local_connection.at(connection_id+2) =  i+2;
             connection_id += 3; 
         }
-        //#endif
 
         for (j = start; j <= finish+1; j++)
         {
@@ -519,10 +519,9 @@ void SphereGlyph::setpolygon()
 
             for (i = 0; i <= slices; i++)
             {
-                //add by shimomura
-                local_coords.at(coord_id)   = t_x + sintemp1 * sinCache1a[i];
-                local_coords.at(coord_id+1) = t_y + sintemp1 * cosCache1a[i];
-                local_coords.at(coord_id+2) = t_z + zLow;
+                local_coords.at(coord_id)   = sintemp1 * sinCache1a[i];
+                local_coords.at(coord_id+1) = sintemp1 * cosCache1a[i];
+                local_coords.at(coord_id+2) = zLow;
                 local_normal.at(coord_id) = sinCache2a[i] * sintemp4;
                 local_normal.at(coord_id+1) = cosCache2a[i] * sintemp4;
                 local_normal.at(coord_id+2) = costemp4;
@@ -543,13 +542,13 @@ void SphereGlyph::setpolygon()
                     vertex_index + line_size,
                     vertex_index + line_size + 1
                 }; 
-                local_connection.at(connection_id  ) = gly_id*n_coords +(local_vertex_index[0]); 
-                local_connection.at(connection_id+1) = gly_id*n_coords +(local_vertex_index[1]); 
-                local_connection.at(connection_id+2) = gly_id*n_coords +(local_vertex_index[2]); 
+                local_connection.at(connection_id  ) = (local_vertex_index[0]); 
+                local_connection.at(connection_id+1) = (local_vertex_index[1]); 
+                local_connection.at(connection_id+2) = (local_vertex_index[2]); 
 
-                local_connection.at(connection_id+3) = gly_id*n_coords +(local_vertex_index[2]); 
-                local_connection.at(connection_id+4) = gly_id*n_coords +(local_vertex_index[1]); 
-                local_connection.at(connection_id+5) = gly_id*n_coords +(local_vertex_index[3]); 
+                local_connection.at(connection_id+3) = (local_vertex_index[2]); 
+                local_connection.at(connection_id+4) = (local_vertex_index[1]); 
+                local_connection.at(connection_id+5) = (local_vertex_index[3]); 
                 connection_id += 6;
                 vertex_index++;  
             }
@@ -564,20 +563,18 @@ void SphereGlyph::setpolygon()
 
         for (i = 0; i <= slices; i++)
         {
-            //add by shimomura
-            local_coords.at(coord_id   ) = t_x + sintemp2 * sinCache1a[i];
-            local_coords.at(coord_id +1) = t_y + sintemp2 * cosCache1a[i];
-            local_coords.at(coord_id +2) = t_z + zHigh;
+            local_coords.at(coord_id   ) = sintemp2 * sinCache1a[i];
+            local_coords.at(coord_id +1) = sintemp2 * cosCache1a[i];
+            local_coords.at(coord_id +2) = zHigh;
             local_normal.at(coord_id   ) = sinCache2a[i] * sintemp3;
             local_normal.at(coord_id +1) = cosCache2a[i] * sintemp3;
             local_normal.at(coord_id +2) = costemp3;
             coord_id      +=3;
         }
 
-        //add by shimomura 
-        local_coords.at(coord_id   ) = t_x + 0.0;
-        local_coords.at(coord_id +1) = t_y + 0.0;
-        local_coords.at(coord_id +2) = t_z + (-radius);
+        local_coords.at(coord_id   ) = 0.0;
+        local_coords.at(coord_id +1) = 0.0;
+        local_coords.at(coord_id +2) = (-radius);
         local_normal.at(coord_id   ) = sinCache2a[stacks] * sinCache2b[stacks];
         local_normal.at(coord_id +1) = cosCache2a[stacks] * sinCache2b[stacks];
         local_normal.at(coord_id +2) = cosCache2b[stacks];
@@ -586,13 +583,18 @@ void SphereGlyph::setpolygon()
 
         for (i = 0; i < slices; i++)
         {
-            local_connection.at(connection_id)   = gly_id*n_coords +n_coords - 1;
-            local_connection.at(connection_id+1) = gly_id*n_coords +n_coords - (slices + 2) + i;
-            local_connection.at(connection_id+2) = gly_id*n_coords +n_coords - (slices + 2) + i + 1;
+            local_connection.at(connection_id)   = n_coords - 1;
+            local_connection.at(connection_id+1) = n_coords - (slices + 2) + i;
+            local_connection.at(connection_id+2) = n_coords - (slices + 2) + i + 1;
             connection_id += 3;  
         }
-    }
+
+    m_coords = local_coords;
+    m_normal = local_normal;
+    m_connection = local_connection; 
+#ifdef DEBUG
     //これらをポリゴンオブジェクトに格納
+    std::cout  <<  __PRETTY_FUNCTION__ <<" : "<<__LINE__ << std::endl;
      SuperClass::setCoords( local_coords  ); 
      SuperClass::setConnections( local_connection );
      SuperClass::setColor( m_color );
@@ -600,14 +602,113 @@ void SphereGlyph::setpolygon()
      SuperClass::setOpacity( int(m_opacity) );
      SuperClass::setPolygonType( kvs::PolygonObject::Triangle );
      SuperClass::setColorType( kvs::PolygonObject::PolygonColor );
-     
-//     std::cout  <<  __PRETTY_FUNCTION__ <<" : "<<__LINE__ << std::endl;
-//  　　ここに格納するとポリゴンになる。
-//　　 polygon renderer で可視化テスト
+#endif
 
 }
 
-//#endif 
+/*===========================================================================*/
+/**
+ *  @brief  transform the glyph element.
+ */
+/*===========================================================================*/
+void SphereGlyph::Transform(const int nglyphs,
+                           const kvs::ValueArray<kvs::Real32>& position,
+                           const kvs::RGBColor color, 
+                           const kvs::ValueArray<kvs::Real32>& sizes )
+//                           const kvs::Real32 size )
+{
+
+    const int n_coords = m_coords.size();
+    const int n_connection = m_connection.size();
+
+    kvs::ValueArray<kvs::Real32> gl_coords;
+    kvs::ValueArray<kvs::UInt32> gl_connection;
+    kvs::ValueArray<kvs::Real32> gl_normal;
+    gl_coords.allocate(nglyphs*n_coords);
+    gl_normal.allocate(nglyphs*n_coords);
+    gl_connection.allocate(nglyphs*n_connection); 
+
+    const kvs::Vec3 DefaultDirection = kvs::Vec3( 0.0, 1.0, 0.0 );
+
+    for (int gly_id = 0; gly_id< nglyphs; gly_id++ )
+    {   
+        int glyph_cnt = gly_id * n_coords/3;
+        int index = 3*gly_id;
+
+        // translate & scaling option
+        const kvs::Vector3f trans_direction(1,0,0);
+        const kvs::Vec3 v = trans_direction.normalized();
+        const kvs::Vec3 c = DefaultDirection.cross( v );
+        const float d = DefaultDirection.dot( v );
+        const float s = static_cast<float>( std::sqrt( ( 1.0 + d ) * 2.0 ) );
+        const kvs::Quaternion q( c.x()/s, c.y()/s, c.z()/s, s/2.0f );
+        const kvs::Mat3 trans_scale = q.toMatrix();
+        const kvs::Vector3f trans_position(position.data()+ index);
+        const kvs::Xform xform_trans( trans_position, BaseClass::scale() * BaseClass::sizes().at(gly_id), trans_scale );
+
+       
+#ifdef DEBUG
+        for(int i =0; i<4 ;i++)
+        {
+            std::cout << "xform_trans.toMatrix[0]["<<i<<"]=" <<xform_trans.toMatrix()[0][i] << std::endl;
+            std::cout << "xform_trans.toMatrix[1]["<<i<<"]=" <<xform_trans.toMatrix()[1][i] << std::endl;
+            std::cout << "xform_trans.toMatrix[2]["<<i<<"]=" <<xform_trans.toMatrix()[2][i] << std::endl;
+            std::cout << "xform_trans.toMatrix[3]["<<i<<"]=" <<xform_trans.toMatrix()[3][i] << std::endl;
+        }
+#endif
+        for (int id = 0; id < n_coords; id +=3)
+        {
+            kvs::Vec3 co(m_coords.at(id), m_coords.at(id+1), m_coords.at(id+2)); 
+            kvs::Vec3 co_normal(m_normal.at(id), m_normal.at(id+1), m_normal.at(id+2)); 
+
+            //scale & translate
+            co        = xform_trans.transform(co);
+            co_normal = xform_trans.transformNormal(co_normal);
+
+            // set global value
+            gl_coords.at(gly_id*n_coords+id  )= co[0]; 
+            gl_coords.at(gly_id*n_coords+id+1)= co[1]; 
+            gl_coords.at(gly_id*n_coords+id+2)= co[2]; 
+            gl_normal.at(gly_id*n_coords+id  )= co_normal[0]; 
+            gl_normal.at(gly_id*n_coords+id+1)= co_normal[1]; 
+            gl_normal.at(gly_id*n_coords+id+2)= co_normal[2]; 
+        }
+        
+        for (int id = 0;id < n_connection; id+=3 )
+        {
+            gl_connection.at(gly_id*n_connection+id  )= m_connection[id+0]+glyph_cnt; 
+            gl_connection.at(gly_id*n_connection+id+1)= m_connection[id+1]+glyph_cnt; 
+            gl_connection.at(gly_id*n_connection+id+2)= m_connection[id+2]+glyph_cnt; 
+        }
+    }
+
+    m_coords.allocate(gl_coords.size());
+    m_normal.allocate(gl_normal.size());
+    m_connection.allocate(gl_connection.size()); 
+
+    m_coords = gl_coords;
+    m_normal = gl_normal;
+    m_connection = gl_connection;
+
+#ifdef DEBUG
+    std::cout << "object->coord()  = " << float(gl_coords[0]) << ", " <<  float(gl_coords[1]) << ", " << float(gl_coords[2]) << ", "  << 
+        float(gl_coords[402]) << ", " <<  float(gl_coords[403]) << ", " << float(gl_coords[404]) << ", " <<
+        float(gl_coords[564]) << ", " <<  float(gl_coords[565]) << ", " << float(gl_coords[566]) << ", " << std::endl;
+    std::cout << "connection[id]  = " << float(gl_connection[882]) << ", " <<  float(gl_connection[883]) << ", " << float(gl_connection[884]) << ", "  << 
+        float(gl_connection[1761]) << ", " <<  float(gl_connection[1762]) << ", " << float(gl_connection[1763]) << ", " << std::endl;
+    std::cout  <<  __PRETTY_FUNCTION__ <<" : "<<__LINE__ << std::endl;
+#endif
+
+    // set polygon
+    SuperClass::setCoords( m_coords  ); 
+    SuperClass::setConnections( m_connection );
+    SuperClass::setColor( m_color );
+    SuperClass::setNormals( m_normal );
+    SuperClass::setOpacity( int(m_opacity) );
+    SuperClass::setPolygonType( kvs::PolygonObject::Triangle );
+    SuperClass::setColorType( kvs::PolygonObject::PolygonColor );
+}
+
 /*===========================================================================*/
 /**
  *  @brief  Draw the glyph element.
@@ -617,6 +718,7 @@ void SphereGlyph::setpolygon()
 /*===========================================================================*/
 void SphereGlyph::draw_element( const kvs::RGBColor& color, const kvs::UInt8 opacity )
 {
+    std::cout  <<  __PRETTY_FUNCTION__ <<" : "<<__LINE__ << std::endl;
     const GLdouble radius = 0.5;
     //const GLint slices = static_cast<GLint>( m_nslices );
     //const GLint stacks = static_cast<GLint>( m_nstacks );
@@ -739,7 +841,7 @@ void SphereGlyph::draw_element( const kvs::RGBColor& color, const kvs::UInt8 opa
     int n_coords = (2*(slices+2) + (slices+1)*(stacks-1));
     //int n_coords = 2 + (slices * stacks);
     int  n_connection = 3*2*slices*stacks; // tet cell type
-    int  n_cells =2 *slices*stacks ;
+    //int  n_cells =2 *slices*stacks;
     kvs::ValueArray<kvs::Real32> coords;
     kvs::ValueArray<kvs::UInt32> connection;
     kvs::ValueArray<kvs::Real32> normal;

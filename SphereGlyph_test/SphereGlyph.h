@@ -53,10 +53,13 @@ private:
     const kvs::PointObject* m_point; ///< pointer to the point object (reference)
     const kvs::VolumeObjectBase* m_volume; ///< pointer to the volume object (reference)
     kvs::ValueArray<kvs::Real32> m_position;
-    kvs::Real32   m_size = 1.0f;
-    kvs::RGBColor m_color = kvs::RGBColor( 255, 255, 255 ); 
-    kvs::UInt8 m_opacity = 255;
-    int m_glyph_num = 1;
+    kvs::Real32   m_size;
+    kvs::RGBColor m_color; 
+    kvs::UInt8 m_opacity;
+    int m_glyph_num;
+    kvs::ValueArray<kvs::Real32> m_coords;
+    kvs::ValueArray<kvs::UInt32> m_connection;
+    kvs::ValueArray<kvs::Real32> m_normal;
 
 public:
 
@@ -65,7 +68,7 @@ public:
     SphereGlyph( const kvs::VolumeObjectBase* volume );
     SphereGlyph( const kvs::VolumeObjectBase* volume, const kvs::TransferFunction& transfer_function );
     SphereGlyph( const int nglyphs, const kvs::ValueArray<kvs::Real32>& position );
-
+    
     void setNumberOfSlices( const size_t nslices ) { m_nslices = nslices; }
     void setNumberOfStacks( const size_t nstacks ) { m_nstacks = nstacks; }
     void setPosition(const kvs::ValueArray<kvs::Real32>& position ){m_position = position;}
@@ -75,7 +78,12 @@ public:
     void setGlyphNum(const int glyph_num ) { m_glyph_num = glyph_num;}
     kvs::UInt8 opacity();
 
-    void setpolygon();
+    void GeneratedNormalizedPolygon();
+    void Transform(const int nglyphs,
+                   const kvs::ValueArray<kvs::Real32>& position,
+                   const kvs::RGBColor color,
+                   const kvs::ValueArray<kvs::Real32>& sizes );
+//                   const kvs::Real32 size );
     void exec( kvs::ObjectBase* object, kvs::Camera* camera, kvs::Light* light );
 
 private:
