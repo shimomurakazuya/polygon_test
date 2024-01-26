@@ -751,21 +751,23 @@ void ArrowGlyph::Transform(const int nglyphs,
         kvs::Vector3f dir(direction.at(index),
                           direction.at(index+1),
                           direction.at(index+2));
-        std::cout << "dir = " << dir.x() << ", "<< dir.y() << ", "<<dir.z() << std::endl;
         // translate & scaling option
         const kvs::Vector3f trans_direction = dir.normalized();
-        std::cout << "trans_direction = " << trans_direction.x() << ", "<< trans_direction.y() << ", "<< trans_direction.z() << std::endl;
         const kvs::Vec3 v = trans_direction.normalized();
         const kvs::Vec3 c = DefaultDirection.cross( v );
-        std::cout << "v = " << v.x() << ", "<< v.y() << ", "<< v.z() << std::endl;
-        std::cout << "c = " << c.x() << ", "<< c.y() << ", "<< c.z() << std::endl;
         const float d = DefaultDirection.dot( v );
         const float s = static_cast<float>( std::sqrt( ( 1.0 + d ) * 2.0 ) );
         const kvs::Quaternion q( c.x()/s, c.y()/s, c.z()/s, s/2.0f );
-        std::cout << "q = " << q.x() << ", "<< q.y() << ", "<< q.z() << ", " << q.w()<< std::endl;
         const kvs::Mat3 trans_scale = q.toMatrix();
         const kvs::Vector3f trans_position(position.data()+ index);
         const kvs::Xform xform_trans( trans_position, BaseClass::scale() * m_size, trans_scale );
+#ifdef DEBUG        
+        std::cout << "dir = " << dir.x() << ", "<< dir.y() << ", "<<dir.z() << std::endl;
+        std::cout << "trans_direction = " << trans_direction.x() << ", "<< trans_direction.y() << ", "<< trans_direction.z() << std::endl;
+        std::cout << "v = " << v.x() << ", "<< v.y() << ", "<< v.z() << std::endl;
+        std::cout << "c = " << c.x() << ", "<< c.y() << ", "<< c.z() << std::endl;
+        std::cout << "q = " << q.x() << ", "<< q.y() << ", "<< q.z() << ", " << q.w()<< std::endl;
+#endif
 
         // rotate option
         float x= V.x();
